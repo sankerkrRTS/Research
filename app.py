@@ -135,14 +135,14 @@ def process_invoice_data(pdf_file, progress=gr.Progress()):
 css = """
 body, #root { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f3f4f6; }
 h1, h2, h3, p { margin: 0; padding: 0; }
-h1 { font-size: 1.25rem; font-weight: 600; color: #f9fafb; letter-spacing: -0.5px; }
+h1 { font-size: 1.5rem; font-weight: 700; color: #111827; letter-spacing: -0.5px; }
 h2 { font-size: 1.125rem; font-weight: 600; color: #111827; }
 h3 { font-size: 0.875rem; font-weight: 500; color: #6b7280; }
 .gradio-container { background: transparent !important; border: none !important; box-shadow: none !important; max-width: 100% !important; padding: 0 !important; }
 #main-layout { display: grid; grid-template-columns: 340px 1fr; min-height: 100vh; }
-#sidebar { background-color: #111827; /* gray-900 */ color: #d1d5db; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+#sidebar { background-color: #ffffff; color: #374151; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; border-right: 1px solid #e5e7eb; }
 #main-content { padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; }
-#sidebar-header p { color: #9ca3af; font-size: 0.875rem; margin-top: 0.5rem; }
+#sidebar-header p { color: #6b7280; font-size: 0.875rem; margin-top: 0.5rem; }
 #parse-button { background-color: #4f46e5; color: white !important; font-weight: 600; border-radius: 0.5rem; border: none; }
 .status-box { margin-top: 1rem; padding: 0.75rem; border-radius: 0.5rem; font-weight: 500; text-align: center; }
 .status-box.success { background-color: #10b9811a; color: #059669; }
@@ -161,7 +161,18 @@ footer { display: none !important; }
 .kpi-card { display: flex; align-items: center; gap: 1rem; background: white; border-radius: 0.75rem; padding: 1.5rem; border: 1px solid #e5e7eb; }
 .kpi-card .icon { width: 2rem; height: 2rem; color: #4f46e5; }
 .kpi-card p { font-size: 1.5rem; font-weight: 700; color: #111827; }
+.kpi-prompt { background-color: #eff6ff; border-color: #dbeafe; }
+.kpi-prompt .icon { color: #2563eb; }
+.kpi-tokens { background-color: #f0fdf4; border-color: #dcfce7; }
+.kpi-tokens .icon { color: #16a34a; }
+.kpi-cost { background-color: #fefce8; border-color: #fef08a; }
+.kpi-cost .icon { color: #ca8a04; }
+.kpi-lines { background-color: #faf5ff; border-color: #f3e8ff; }
+.kpi-lines .icon { color: #9333ea; }
 .gr-dataframe table tr:last-child { font-weight: 700; background-color: #f9fafb; border-top: 2px solid #e5e7eb; }
+.progress-bar { background-color: #e5e7eb !important; border-radius: 0.5rem; }
+.progress-bar-indicator { background-color: #4f46e5 !important; border-radius: 0.5rem; }
+.progress-text { color: #111827 !important; font-weight: 500; }
 """
 
 # --- Gradio UI Layout ---
@@ -181,10 +192,10 @@ with gr.Blocks(css=css, theme=gr.themes.Base()) as app:
                 results_header = gr.HTML(elem_classes="content-card")
                 
                 with gr.Row(elem_id="kpi-row"):
-                    kpi_prompt = gr.HTML(elem_classes="kpi-card")
-                    kpi_tokens = gr.HTML(elem_classes="kpi-card")
-                    kpi_cost = gr.HTML(elem_classes="kpi-card")
-                    kpi_lines = gr.HTML(elem_classes="kpi-card")
+                    kpi_prompt = gr.HTML(elem_classes="kpi-card kpi-prompt")
+                    kpi_tokens = gr.HTML(elem_classes="kpi-card kpi-tokens")
+                    kpi_cost = gr.HTML(elem_classes="kpi-card kpi-cost")
+                    kpi_lines = gr.HTML(elem_classes="kpi-card kpi-lines")
                 
                 with gr.Group(elem_classes="content-card"):
                     with gr.Row():
@@ -209,4 +220,5 @@ with gr.Blocks(css=css, theme=gr.themes.Base()) as app:
         ]
     )
 
-app.launch(auth=APP_AUTH)
+if __name__ == "__main__":
+    app.launch(auth=APP_AUTH)
