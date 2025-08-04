@@ -222,3 +222,4 @@ with gr.Blocks(css=css, theme=gr.themes.Base()) as app:
 
 if __name__ == "__main__":
     app.launch(auth=APP_AUTH)
+# --- End of app.py ---
