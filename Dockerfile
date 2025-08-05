@@ -1,20 +1,18 @@
-# Use an official Python runtime as a parent image
+# Use official Python image
 FROM python:3.12-slim
 
-# Set the working directory in the container
+# Set working directory
 WORKDIR /app
 
-# Copy the requirements file into the container
+# Install dependencies
 COPY requirements.txt .
-
-# Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application's code into the container
+# Copy all source code
 COPY . .
 
-# Make port 8000 available to the world outside this container
+# Tell Azure and Docker what internal port this app listens on
 EXPOSE 8000
 
-# Define the command to run your app using Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "app:app"]
+# Run the Gradio app
+CMD ["python", "app.py"]
