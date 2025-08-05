@@ -4,6 +4,8 @@ import pandas as pd
 import math
 import time
 import os
+import logging
+from opencensus.ext.azure.log_exporter import AzureLogHandler
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,6 +16,24 @@ BEARER_TOKEN = os.getenv('BEARER_TOKEN')
 APP_USER = os.getenv('APP_USER')
 APP_PASSWORD = os.getenv('APP_PASSWORD')
 APP_AUTH = (APP_USER, APP_PASSWORD) if APP_USER and APP_PASSWORD else None
+APPINSIGHTS_CONNECTION_STRING = os.getenv('APPLICATIONINSIGHTS_CONNECTION_STRING')
+
+# --- Logger Setup ---
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Add a console handler for local development and standard output
+if not any(isinstance(handler, logging.StreamHandler) for handler in logger.handlers):
+    console_handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+# Add Azure Application Insights handler if the connection string is available
+if APPINSIGHTS_CONNECTION_STRING:
+    azure_handler = AzureLogHandler(connection_string=APPINSIGHTS_CONNECTION_STRING)
+    logger.addHandler(azure_handler)
+    logger.info("Application Insights logger configured.")
 
 # --- SVG Icons ---
 KPI_ICONS = {
@@ -29,22 +49,35 @@ def process_invoice_data(pdf_file, progress=gr.Progress()):
     initial_updates = {
         status_output: gr.update(value=""),
         results_col: gr.update(visible=False),
+        placeholder_col: gr.update(visible=True),
         validated_status_box: gr.update(visible=False),
         mismatch_status_box: gr.update(visible=False)
     }
     if pdf_file is None:
+        logger.warning("Invoice processing attempt failed: No PDF file was uploaded.")
         initial_updates[status_output] = gr.update(value="<div class='status-box error'>❌ Please upload a PDF file.</div>")
         return initial_updates
 
+    filename = os.path.basename(pdf_file.name)
+    logger.info("Starting invoice processing for: %s", filename)
     headers = {'Authorization': f'Bearer {BEARER_TOKEN}'}
+    
     try:
         progress(0, desc="🚀 Analyzing Document...")
         with open(pdf_file.name, 'rb') as f:
             files = {'file': (pdf_file.name, f, 'application/pdf')}
             response = requests.post(N8N_WEBHOOK_URL, headers=headers, files=files, timeout=600)
             response.raise_for_status()
+        logger.info("Successfully received data from webhook for: %s", filename)
         progress(0.9, desc="✅ Success! Formatting results...")
+        json_data = response.json()
 
+    except requests.exceptions.RequestException as e:
+        logger.error("Request to webhook failed for file: %s. Error: %s", filename, str(e), exc_info=True)
+        initial_updates[status_output] = gr.update(value=f"<div class='status-box error'>❌ A network error occurred.</div>")
+        return initial_updates
+
+    try:
         json_data = response.json()
         content = json_data.get('message', {}).get('content', {})
         
@@ -67,13 +100,15 @@ def process_invoice_data(pdf_file, progress=gr.Progress()):
         validation_status_update = gr.update(visible=False)
         mismatch_status_update = gr.update(visible=False)
         if math.isclose(invoice_total, line_total_sum, rel_tol=1e-2):
+            logger.info("Validation successful for %s. Invoice Total: $%s, Line Sum: $%s", filename, invoice_total, line_total_sum)
             validation_status_update = gr.update(visible=True)
         else:
+            logger.warning("Validation mismatch for %s. Invoice Total: $%s, Line Sum: $%s", filename, invoice_total, line_total_sum)
             mismatch_status_update = gr.update(visible=True, value=f"MISMATCH (Lines Sum: ${line_total_sum:,.2f})")
 
-        filename = os.path.basename(pdf_file.name)
         
         # --- Build Enhanced Header HTML ---
+        # ... (HTML building logic remains the same)
         service_locations_html = ""
         service_locations_data = content.get('service_locations', [])
         for loc in service_locations_data:
@@ -116,6 +151,7 @@ def process_invoice_data(pdf_file, progress=gr.Progress()):
         final_updates = {
             status_output: gr.update(value="<div class='status-box success'>✅ Analysis Complete.</div>"),
             results_col: gr.update(visible=True),
+            placeholder_col: gr.update(visible=False),
             results_header: gr.update(value=header_html),
             kpi_prompt: gr.update(value=f"<div class='kpi-icon'>{KPI_ICONS['prompt']}</div><div><h3>Prompt Version</h3><p>{prompt_version}</p></div>"),
             kpi_tokens: gr.update(value=f"<div class='kpi-icon'>{KPI_ICONS['tokens']}</div><div><h3>Tokens Used</h3><p>{tokens_used}</p></div>"),
@@ -126,10 +162,12 @@ def process_invoice_data(pdf_file, progress=gr.Progress()):
             validated_status_box: validation_status_update,
             mismatch_status_box: mismatch_status_update,
         }
+        logger.info("Successfully completed analysis for: %s", filename)
         return final_updates
         
     except Exception as e:
-        initial_updates[status_output] = gr.update(value=f"<div class='status-box error'>❌ An error occurred: {str(e)}</div>")
+        logger.error("Failed to parse webhook response for file: %s. Error: %s", filename, str(e), exc_info=True)
+        initial_updates[status_output] = gr.update(value=f"<div class='status-box error'>❌ Error processing response data.</div>")
         return initial_updates
 # --- CSS Block Inspired by Salient Tailwind UI ---
 css = """
@@ -148,9 +186,14 @@ h3 { font-size: 0.875rem; font-weight: 500; color: #6b7280; }
 .status-box.success { background-color: #10b9811a; color: #059669; }
 .status-box.error { background-color: #ef44441a; color: #dc2626; }
 footer { display: none !important; }
+#placeholder-col { text-align: center; margin: auto; }
+.placeholder-content { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; color: #6b7280; padding: 4rem 2rem; border: 2px dashed #d1d5db; border-radius: 0.75rem; background-color: #fafafa; }
+.placeholder-content svg { width: 3rem; height: 3rem; color: #9ca3af; }
+.placeholder-content h3 { font-size: 1.125rem; font-weight: 600; color: #374151; }
+.placeholder-content p { max-width: 300px; }
 .content-card { background-color: white; border-radius: 0.75rem; padding: 1.5rem; border: 1px solid #e5e7eb; }
 .results-header-title { display: flex; justify-content: space-between; align-items: flex-start; }
-.validation-status { font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.75rem; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; margin-left: 1rem; }
+.validation-status-badge { font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.75rem; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; margin-left: 1rem; }
 .status-validated { background-color: #dcfce7; color: #166534; }
 .status-mismatch { background-color: #fee2e2; color: #991b1b; }
 .header-details-list { border-top: 1px solid #e5e7eb; margin-top: 1rem; padding-top: 1rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
@@ -188,6 +231,17 @@ with gr.Blocks(css=css, theme=gr.themes.Base()) as app:
         # --- Main Content Area ---
         with gr.Column(scale=4, elem_id="main-content"):
             gr.Markdown("<h2>Dashboard</h2>")
+            with gr.Column(elem_id="placeholder-col") as placeholder_col:
+                gr.HTML("""
+                    <div class="placeholder-content">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                        </svg>
+                        <h3>Upload an invoice to get started</h3>
+                        <p>The analysis results will appear here once you upload and process a PDF file.</p>
+                    </div>
+                """)
+
             with gr.Column(visible=False) as results_col:
                 results_header = gr.HTML(elem_classes="content-card")
                 
@@ -213,7 +267,7 @@ with gr.Blocks(css=css, theme=gr.themes.Base()) as app:
         fn=process_invoice_data,
         inputs=[pdf_upload],
         outputs=[
-            status_output, results_col, results_header, 
+            status_output, results_col, placeholder_col, results_header, 
             kpi_prompt, kpi_tokens, kpi_cost, kpi_lines,
             line_items_table, json_output,
             validated_status_box, mismatch_status_box
