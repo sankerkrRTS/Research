@@ -275,5 +275,9 @@ with gr.Blocks(css=css, theme=gr.themes.Base()) as app:
     )
 
 if __name__ == "__main__":
-    app.launch(auth=APP_AUTH)
+    app.launch(
+        auth=APP_AUTH,
+        server_name="0.0.0.0",
+        server_port=8000  # match EXPOSE in Dockerfile
+    )
 # --- End of app.py ---
