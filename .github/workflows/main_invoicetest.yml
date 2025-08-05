@@ -71,3 +71,4 @@ jobs:
           startup-command: 'gunicorn --bind=0.0.0.0 --workers=4 app:app'
         env:
           SCM_DO_BUILD_DURING_DEPLOYMENT: false
+          ENABLE_ORYX_BUILD: false
