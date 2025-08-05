@@ -36,23 +36,22 @@ jobs:
           docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/invoicetest:${{ github.sha }}
 
   deploy-to-app-service:
-    runs-on: ubuntu-latest
-    needs: build-and-push-image
-    # Permissions are also required for the deploy job
-    permissions:
-      id-token: write
-    
-    steps:
-      - name: Log in to Azure
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_2EB9B3F9DB8A44FE8536A3107F2ABAD4 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_53DA8E675EFE4A0B9B5E37AF07AAB4E5 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_007C89AD0D344198AF77A056C302470C }}
-
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: 'InvoiceTest'
-          images: '${{ secrets.REGISTRY_LOGIN_SERVER }}/invoicetest:${{ github.sha }}'
-
+      runs-on: ubuntu-latest
+      needs: build-and-push-image
+      permissions:
+        id-token: write # Required for OIDC login
+      
+      steps:
+        - name: Log in to Azure
+          uses: azure/login@v2
+          with:
+            client-id: ${{ secrets.AZURE_CLIENT_ID }}
+            tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+            subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  
+        - name: Deploy to Azure Web App
+          uses: azure/webapps-deploy@v3
+          with:
+            app-name: 'InvoiceTest'
+            images: '${{ secrets.REGISTRY_LOGIN_SERVER }}/invoicetest:${{ github.sha }}'
+  
